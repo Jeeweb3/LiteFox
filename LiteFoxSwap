@@ -1,0 +1,25 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+
+declare_id!("LFXSwap11111111111111111111111111111111111");
+
+#[program]
+pub mod litefox_swap {
+    use super::*;
+
+    // Initialize a new liquidity pool
+    pub fn initialize_pool(
+        ctx: Context<InitializePool>,
+        initial_lfx_amount: u64,
+        initial_sol_amount: u64,
+    ) -> Result<()> {
+        let pool = &mut ctx.accounts.pool_state;
+        pool.authority = *ctx.accounts.authority.key;
+        pool.lfx_vault = *ctx.accounts.lfx_vault.to_account_info().key;
+        pool.sol_vault = *ctx.accounts.sol_vault.to_account_info().key;
+        pool.total_lfx = initial_lfx_amount;
+        pool.total_sol = initial_sol_amount;
+
+        // Transfer initial LFX from user to vault
+        token::transfer(
+            ctx.accounts.into_transfer_to_v
