@@ -1,0 +1,24 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
+
+declare_id!("LFXDAO1111111111111111111111111111111111111");
+
+#[program]
+pub mod litefox_dao {
+    use super::*;
+
+    /// Initialize the DAO state, linking the treasury accounts
+    pub fn initialize_dao(
+        ctx: Context<InitializeDAO>,
+        dao_name: String,
+    ) -> Result<()> {
+        let dao_state = &mut ctx.accounts.dao_state;
+        dao_state.authority = *ctx.accounts.authority.key;
+        dao_state.dao_name = dao_name;
+        dao_state.treasury_sol = *ctx.accounts.treasury_sol.to_account_info().key;
+        dao_state.treasury_token = *ctx.accounts.treasury_token.to_account_info().key;
+        Ok(())
+    }
+
+    /// Deposit LFX tokens into DAO treasury
+    pub fn deposit_tokens(ctx: Context
