@@ -1,0 +1,131 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Mint, TokenAccount, MintTo, Token};
+
+declare_id!("LFX1111111111111111111111111111111111111111");
+
+#[program]
+pub mod litefox_token {
+    use super::*;
+
+    // Initialize LFX token mint and allocate initial supply
+    pub fn initialize_token(
+        ctx: Context<InitializeToken>,
+        total_supply: u64,
+        dev_allocation: u64,
+        dao_allocation: u64,
+        presale_allocation: u64,
+    ) -> Result<()> {
+        let token_state = &mut ctx.accounts.token_state;
+        token_state.authority = *ctx.accounts.authority.key;
+        token_state.total_supply = total_supply;
+        token_state.dev_allocation = dev_allocation;
+        token_state.dao_allocation = dao_allocation;
+        token_state.presale_allocation = presale_allocation;
+
+        // Mint full supply to token vault
+        let cpi_accounts = MintTo {
+            mint: ctx.accounts.lfx_mint.to_account_info(),
+            to: ctx.accounts.token_vault.to_account_info(),
+            authority: ctx.accounts.token_vault_authority.to_account_info(),
+        };
+        let signer_seeds = &[
+            b"token_vault_authority",
+            &[*ctx.bumps.get("token_vault_authority").unwrap()]
+        ];
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        token::mint_to(
+            CpiContext::new_with_signer(cpi_program, cpi_accounts, &[signer_seeds]),
+            total_supply,
+        )?;
+        Ok(())
+    }
+
+    // Transfer LFX to DAO, Dev, and presale vaults
+    pub fn allocate_tokens(ctx: Context<AllocateTokens>) -> Result<()> {
+        let token_state = &ctx.accounts.token_state;
+
+        // Dev allocation
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.token_vault.to_account_info(),
+                    to: ctx.accounts.dev_token_account.to_account_info(),
+                    authority: ctx.accounts.token_vault_authority.to_account_info(),
+                },
+            ),
+            token_state.dev_allocation,
+        )?;
+
+        // DAO allocation
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.token_vault.to_account_info(),
+                    to: ctx.accounts.dao_token_account.to_account_info(),
+                    authority: ctx.accounts.token_vault_authority.to_account_info(),
+                },
+            ),
+            token_state.dao_allocation,
+        )?;
+
+        // Presale allocation
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.token_vault.to_account_info(),
+                    to: ctx.accounts.presale_token_vault.to_account_info(),
+                    authority: ctx.accounts.token_vault_authority.to_account_info(),
+                },
+            ),
+            token_state.presale_allocation,
+        )?;
+        Ok(())
+    }
+}
+
+// -------------------- Accounts --------------------
+#[account]
+pub struct TokenState {
+    pub authority: Pubkey,
+    pub total_supply: u64,
+    pub dev_allocation: u64,
+    pub dao_allocation: u64,
+    pub presale_allocation: u64,
+}
+
+// -------------------- Contexts --------------------
+#[derive(Accounts)]
+pub struct InitializeToken<'info> {
+    #[account(init, payer = authority, space = 8 + 64)]
+    pub token_state: Account<'info, TokenState>,
+    #[account(mut)]
+    pub lfx_mint: Account<'info, anchor_spl::token::Mint>,
+    #[account(mut, seeds=[b"token_vault_authority"], bump)]
+    pub token_vault_authority: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub token_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AllocateTokens<'info> {
+    #[account(mut)]
+    pub token_state: Account<'info, TokenState>,
+    #[account(mut)]
+    pub token_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub dev_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub dao_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub presale_token_vault: Account<'info, TokenAccount>,
+    #[account(mut, seeds=[b"token_vault_authority"], bump)]
+    pub token_vault_authority: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
+}
