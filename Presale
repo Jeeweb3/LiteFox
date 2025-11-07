@@ -1,0 +1,24 @@
+// LiteFox Anchor Programs
+// Project: litefox-presale
+// This single-file Anchor program contains Presale and Dev Vesting
+// Place in Anchor project: programs/litefox-presale/src/lib.rs
+
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo};
+
+declare_id!("LiteFox1111111111111111111111111111111111111");
+
+#[program]
+pub mod litefox_presale {
+    use super::*;
+
+    pub fn initialize_presale(
+        ctx: Context<InitializePresale>,
+        presale_start: i64,
+        presale_end: i64,
+        presale_token_amount: u64,
+    ) -> Result<()> {
+        let state = &mut ctx.accounts.presale_state;
+        state.authority = *ctx.accounts.authority.key;
+        state.presale_start = presale_start;
+        state.presale_end = presale
